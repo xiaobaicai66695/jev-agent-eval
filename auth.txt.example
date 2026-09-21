@@ -1,3 +1,3 @@
-# Put only your Cloudflare API token on the next line.
-# The token must be permitted to run Workers AI for the selected account.
-YOUR_CLOUDFLARE_API_TOKEN
+# Put only your TypeSafe API key on the next line.
+# Get it from https://console.typesafe.ai.
+YOUR_TYPESAFE_API_KEY

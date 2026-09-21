@@ -7,8 +7,7 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { assignRubric, getAgent, getRubricForAgent, openDatabase, recordEvaluation, upsertAgent, upsertRubric } from "./storage.js";
 
-const MODEL = "typesafe/jev";
-const ACCOUNT_ID_ENV = "CLOUDFLARE_ACCOUNT_ID";
+const MODEL = "jev-latest";
 const DEFAULT_DATABASE = "data/agent-eval.sqlite";
 type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
@@ -105,7 +104,7 @@ function variantToJson(variant: Variant): JsonObject {
 
 export function buildJevRequest(input: AgentEvalCase, rubric: RubricProfile, pair: BlindPair): JsonObject {
   const scoreCriteria = ["未满足：未达到关键验收标准或有重大错误", "部分满足：达到部分标准，但有明显遗漏或风险", "充分满足：达到验收标准且没有证据显示明显回归"];
-  return { model: MODEL, input: { state: {
+  return { model: MODEL, state: {
     task: input.task,
     rubric: rubric.criteria,
     deterministic_check_results: input.deterministic_checks.map(({ id, baseline, candidate }) => ({ id, variant_a: pair.candidate_variant === "variant_a" ? candidate : baseline, variant_b: pair.candidate_variant === "variant_b" ? candidate : baseline })),
@@ -116,7 +115,7 @@ export function buildJevRequest(input: AgentEvalCase, rubric: RubricProfile, pai
     variant_a_task_fulfillment: { type: "score", instructions: "variant_a 对任务验收标准的完成程度如何？", criteria: scoreCriteria },
     variant_b_task_fulfillment: { type: "score", instructions: "variant_b 对任务验收标准的完成程度如何？", criteria: scoreCriteria },
     needs_human_audit: { type: "noul", instructions: "在保留或回滚此修改前，是否需要人工审计？", criteria: { true: "结果有关键不确定性、证据冲突、或可能存在未覆盖的重大回归", false: "现有证据足以进行常规 benchmark 决策" } },
-  } } };
+  } };
 }
 
 function number(value: unknown): number | null { return typeof value === "number" && Number.isFinite(value) ? value : null; }
@@ -147,10 +146,10 @@ export function deriveDecision(response: JevResponse | null, input: AgentEvalCas
 }
 
 async function readJson(path: string): Promise<unknown> { try { return JSON.parse(await readFile(path, "utf8")); } catch (error) { throw new InputError(`cannot read valid JSON from ${path}: ${error instanceof Error ? error.message : String(error)}`); } }
-async function loadApiToken(): Promise<string> { const path = resolve(import.meta.dirname, "..", "auth.txt"); let token: string; try { token = (await readFile(path, "utf8")).trim(); } catch { throw new InputError(`API token not found. Create ${path} from auth.txt.example.`); } if (!token || token === "YOUR_CLOUDFLARE_API_TOKEN") throw new InputError(`${path} must contain a Cloudflare API token`); return token; }
-async function callJev(requestBody: JsonObject, accountId: string, token: string, timeoutMs: number): Promise<JevResponse> {
-  let response: Response; try { response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/run`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(requestBody), signal: AbortSignal.timeout(timeoutMs) }); } catch (error) { throw new Error(`Jev request failed: ${error instanceof Error ? error.message : String(error)}`); }
-  const body: unknown = await response.json().catch(() => null); if (!response.ok) throw new Error(`Jev request failed with HTTP ${response.status}: ${JSON.stringify(body)}`); if (!isObject(body)) throw new Error("Jev returned a non-object JSON response"); if (body.success === false) throw new Error(`Cloudflare rejected the request: ${JSON.stringify(body)}`); return (isObject(body.result) ? body.result : body) as JevResponse;
+async function loadApiToken(): Promise<string> { const path = resolve(import.meta.dirname, "..", "..", "auth.txt"); let token: string; try { token = (await readFile(path, "utf8")).trim(); } catch { throw new InputError(`API key not found. Create ${path} from auth.txt.example.`); } if (!token || token === "YOUR_TYPESAFE_API_KEY") throw new InputError(`${path} must contain a TypeSafe API key`); return token; }
+async function callJev(requestBody: JsonObject, token: string, timeoutMs: number): Promise<JevResponse> {
+  let response: Response; try { response = await fetch("https://api.typesafe.ai/v1/systemone", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(requestBody), signal: AbortSignal.timeout(timeoutMs) }); } catch (error) { throw new Error(`Jev request failed: ${error instanceof Error ? error.message : String(error)}`); }
+  const body: unknown = await response.json().catch(() => null); if (!response.ok) throw new Error(`Jev request failed with HTTP ${response.status}: ${JSON.stringify(body)}`); if (!isObject(body)) throw new Error("Jev returned a non-object JSON response"); return body as JevResponse;
 }
 function metric(value: number | null): string { return value === null ? "—" : value.toFixed(2); }
 function artifactName(caseId: string): string { const slug = caseId.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase() || "agent-eval"; return `${new Date().toISOString().replace(/[-:.]/g, "")}-${slug.slice(0, 48)}`; }
@@ -162,14 +161,14 @@ async function writeArtifacts(outputDir: string, caseInput: AgentEvalCase, artif
 }
 
 type Command = "init-db" | "upsert-rubric" | "upsert-agent" | "assign-rubric" | "validate" | "evaluate";
-interface Args { command: Command; database: string; input?: string; file?: string; agentId?: string; agentName?: string; rubricId?: string; dryRun: boolean; accountId?: string; timeoutMs: number; outputDir: string; seed?: string }
+interface Args { command: Command; database: string; input?: string; file?: string; agentId?: string; agentName?: string; rubricId?: string; dryRun: boolean; timeoutMs: number; outputDir: string; seed?: string }
 function parseArgs(argv: string[]): Args {
   const [command, ...rest] = argv; if (!(["init-db", "upsert-rubric", "upsert-agent", "assign-rubric", "validate", "evaluate"] as string[]).includes(command ?? "")) throw new InputError("usage: agent_eval <init-db|upsert-rubric|upsert-agent|assign-rubric|validate|evaluate> [options]");
-  const values = new Map<string, string | boolean>(); const valued = ["--database", "--input", "--file", "--agent-id", "--name", "--rubric-id", "--account-id", "--timeout", "--output-dir", "--seed"];
+  const values = new Map<string, string | boolean>(); const valued = ["--database", "--input", "--file", "--agent-id", "--name", "--rubric-id", "--timeout", "--output-dir", "--seed"];
   for (let index = 0; index < rest.length; index += 1) { const flag = rest[index]; if (flag === "--dry-run") { values.set(flag, true); continue; } if (!valued.includes(flag ?? "")) throw new InputError(`unknown argument: ${flag}`); const value = rest[index + 1]; if (!value || value.startsWith("--")) throw new InputError(`${flag} requires a value`); values.set(flag!, value); index += 1; }
   const get = (flag: string): string | undefined => typeof values.get(flag) === "string" ? values.get(flag) as string : undefined;
   const seconds = get("--timeout") === undefined ? 30 : Number(get("--timeout")); if (!Number.isFinite(seconds) || seconds <= 0) throw new InputError("--timeout must be a positive number of seconds");
-  return { command: command as Command, database: get("--database") ?? DEFAULT_DATABASE, input: get("--input"), file: get("--file"), agentId: get("--agent-id"), agentName: get("--name"), rubricId: get("--rubric-id"), dryRun: values.get("--dry-run") === true, accountId: get("--account-id"), timeoutMs: seconds * 1_000, outputDir: get("--output-dir") ?? "artifacts", seed: get("--seed") };
+  return { command: command as Command, database: get("--database") ?? DEFAULT_DATABASE, input: get("--input"), file: get("--file"), agentId: get("--agent-id"), agentName: get("--name"), rubricId: get("--rubric-id"), dryRun: values.get("--dry-run") === true, timeoutMs: seconds * 1_000, outputDir: get("--output-dir") ?? "artifacts", seed: get("--seed") };
 }
 function requireArg(value: string | undefined, flag: string): string { if (!value) throw new InputError(`${flag} is required`); return value; }
 
@@ -183,7 +182,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       if (args.command === "assign-rubric") { assignRubric(database, requireArg(args.agentId, "--agent-id"), requireArg(args.rubricId, "--rubric-id")); console.log(JSON.stringify({ status: "assigned", agent_id: args.agentId, rubric_id: args.rubricId }, null, 2)); return 0; }
       const agentId = requireArg(args.agentId, "--agent-id"); const input = await readJson(requireArg(args.input, "--input")); validateCase(input); const agent = getAgent(database, agentId); if (!agent) throw new InputError(`agent not found: ${agentId}`); const rubric = getRubricForAgent(database, agentId); validateRubric(rubric); const gate = evaluateDeterministicGate(input);
       if (args.command === "validate") { console.log(JSON.stringify({ status: "valid", agent, rubric_id: rubric.id, deterministic_gate: gate }, null, 2)); return 0; }
-      const pair = blindPair(input, args.seed); const request = buildJevRequest(input, rubric, pair); const response = !gate.passed || args.dryRun ? null : await callJev(request, args.accountId ?? process.env[ACCOUNT_ID_ENV] ?? (() => { throw new InputError(`provide --account-id or set ${ACCOUNT_ID_ENV}`); })(), await loadApiToken(), args.timeoutMs); const decision = deriveDecision(response, input, rubric, pair, gate);
+      const pair = blindPair(input, args.seed); const request = buildJevRequest(input, rubric, pair); const response = !gate.passed || args.dryRun ? null : await callJev(request, await loadApiToken(), args.timeoutMs); const decision = deriveDecision(response, input, rubric, pair, gate);
       const audit: JsonObject = { schema_version: 2, evaluation_id: randomUUID(), generated_at: new Date().toISOString(), agent_id: agentId, rubric: rubric as unknown as JsonValue, case: input as unknown as JsonValue, deterministic_gate: gate as unknown as JsonValue, blind_assignment: { seed: pair.seed, candidate_variant: pair.candidate_variant }, jev_request: request, raw_model_response: response as unknown as JsonValue, decision: decision as unknown as JsonValue };
       const paths = await writeArtifacts(args.outputDir, input, audit); recordEvaluation(database, { id: audit.evaluation_id as string, agentId, rubricId: rubric.id, caseId: input.case_id, status: decision.status, verdict: decision.verdict, audit }); console.log(JSON.stringify({ status: decision.status, verdict: decision.verdict, winner: decision.winner, rubric_id: rubric.id, json_artifact: paths.json, markdown_artifact: paths.markdown }, null, 2)); return decision.verdict === "revert" && decision.status === "deterministic_reject" ? 2 : 0;
     } finally { database.close(); }

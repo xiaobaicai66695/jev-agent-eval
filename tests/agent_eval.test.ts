@@ -27,7 +27,7 @@ test("an agent resolves to its own SQLite rubric", async () => {
 test("blind request hides baseline and candidate roles", () => {
   validateCase(caseInput);
   const request = buildJevRequest(caseInput, rubric, blindPair(caseInput, "fixed-seed"));
-  const state = (request.input as Record<string, unknown>).state as Record<string, unknown>;
+  const state = request.state as Record<string, unknown>;
   assert.ok(state.variant_a);
   assert.ok(state.variant_b);
   assert.equal("baseline" in state, false);

@@ -32,7 +32,7 @@ Use this skill to run auditable before/after Agent evaluations. Each Agent ID is
    node dist/src/agent_eval.js evaluate --agent-id support-agent --input examples/cases/support-answer-format-v1.json --dry-run --seed demo-001
    ```
 
-4. For a live evaluation, put only the Cloudflare API token in `auth.txt`, then provide `--account-id` or `CLOUDFLARE_ACCOUNT_ID`.
+4. For a live evaluation, put only the TypeSafe API key in `auth.txt`. No account ID is required.
 
 ## Package the CLI
 

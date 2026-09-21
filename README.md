@@ -1,6 +1,6 @@
 # Jev Agent Eval
 
-> 用 [Jev](https://developers.cloudflare.com/ai/models/typesafe/jev/) 对多个 Agent 的 benchmark 与前后版本改动进行可审计、概率化的 A/B 评测。
+> 用 [Jev](https://docs.typesafe.ai/introduction) 对多个 Agent 的 benchmark 与前后版本改动进行可审计、概率化的 A/B 评测。
 
 [English](#english) · [中文](#中文)
 
@@ -63,10 +63,10 @@ jev-agent-eval assign-rubric --agent-id support-agent --rubric-id support-qualit
 jev-agent-eval evaluate --agent-id support-agent --input examples/cases/support-answer-format-v1.json --dry-run
 ```
 
-真实调用时，在未提交的根目录 `auth.txt` 放 Cloudflare API Token，并提供账户 ID：
+真实调用时，在未提交的根目录 `auth.txt` 放 TypeSafe API Key：
 
 ```powershell
-node dist/src/agent_eval.js evaluate --agent-id support-agent --input examples/cases/support-answer-format-v1.json --account-id <CLOUDFLARE_ACCOUNT_ID>
+node dist/src/agent_eval.js evaluate --agent-id support-agent --input examples/cases/support-answer-format-v1.json
 ```
 
 默认 SQLite 数据库为 `data/agent-eval.sqlite`，可用 `--database <path>` 覆盖。数据库、审计产物和 API Key 都不会提交到 Git。
@@ -125,7 +125,7 @@ npm install -g .\jev-agent-eval-0.1.0.tgz
 
 After installation, use `jev-agent-eval evaluate ...` instead of `node dist/src/agent_eval.js evaluate ...`.
 
-For a live call, put a Cloudflare API token in untracked root `auth.txt`, then provide `--account-id`. Use `--database <path>` for another SQLite registry. The default database, artifacts, and API key are ignored by Git.
+For a live call, put a TypeSafe API key in untracked root `auth.txt`, then run the same `evaluate` command without `--dry-run`. Use `--database <path>` for another SQLite registry. The default database, artifacts, and API key are ignored by Git.
 
 ### Safeguards
 
