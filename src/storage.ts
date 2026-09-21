@@ -30,6 +30,7 @@ export function openDatabase(path: string): Database.Database {
       agent_id TEXT NOT NULL REFERENCES agents(id),
       rubric_id TEXT NOT NULL REFERENCES rubrics(id),
       case_id TEXT NOT NULL,
+      evaluation_type TEXT NOT NULL DEFAULT 'compare',
       created_at TEXT NOT NULL,
       status TEXT NOT NULL,
       verdict TEXT,
@@ -37,6 +38,8 @@ export function openDatabase(path: string): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS evaluations_agent_case_idx ON evaluations(agent_id, case_id, created_at);
   `);
+  const columns = database.prepare("PRAGMA table_info(evaluations)").all() as Array<{ name: string }>;
+  if (!columns.some((column) => column.name === "evaluation_type")) database.exec("ALTER TABLE evaluations ADD COLUMN evaluation_type TEXT NOT NULL DEFAULT 'compare'");
   return database;
 }
 
@@ -73,8 +76,8 @@ export function getRubricForAgent(database: Database.Database, agentId: string):
   return { id: row.id, name: row.name, criteria: JSON.parse(row.criteria_json) as string[], minimum_choice_confidence: row.minimum_choice_confidence, maximum_human_review_probability: row.maximum_human_review_probability };
 }
 
-export function recordEvaluation(database: Database.Database, values: { id: string; agentId: string; rubricId: string; caseId: string; status: string; verdict: string | null; audit: unknown }): void {
-  database.prepare(`INSERT INTO evaluations (id, agent_id, rubric_id, case_id, created_at, status, verdict, audit_json)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(values.id, values.agentId, values.rubricId, values.caseId, new Date().toISOString(), values.status, values.verdict, JSON.stringify(values.audit));
+export function recordEvaluation(database: Database.Database, values: { id: string; agentId: string; rubricId: string; caseId: string; evaluationType: "score" | "compare"; status: string; verdict: string | null; audit: unknown }): void {
+  database.prepare(`INSERT INTO evaluations (id, agent_id, rubric_id, case_id, evaluation_type, created_at, status, verdict, audit_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(values.id, values.agentId, values.rubricId, values.caseId, values.evaluationType, new Date().toISOString(), values.status, values.verdict, JSON.stringify(values.audit));
 }

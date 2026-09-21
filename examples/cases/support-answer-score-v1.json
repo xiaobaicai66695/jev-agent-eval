@@ -1,0 +1,15 @@
+{
+  "case_id": "support-answer-score-v1",
+  "task": {
+    "objective": "回答用户的退款请求，并明确下一步操作。",
+    "acceptance_criteria": ["准确说明退款资格条件", "给出用户可执行的下一步", "不承诺未验证的退款结果"]
+  },
+  "deterministic_checks": [
+    { "id": "policy-citation-present", "status": "pass", "required_for_score": true },
+    { "id": "response-schema-valid", "status": "pass", "required_for_score": true }
+  ],
+  "subject": {
+    "artifact": "你的订单仍在 30 天退款窗口内，可以提交退款申请。请在订单页选择“申请退款”；审核通过后会按原支付方式退款。",
+    "evidence": { "policy": "订单在购买后 30 天内且未大量使用时可申请退款。" }
+  }
+}
