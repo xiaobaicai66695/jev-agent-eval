@@ -1,0 +1,11 @@
+{
+  "id": "support-quality-v1",
+  "name": "Support answer quality v1",
+  "criteria": [
+    "事实准确性优先于表达风格",
+    "完整覆盖验收标准",
+    "避免不受证据支持的承诺"
+  ],
+  "minimum_choice_confidence": 0.75,
+  "maximum_human_review_probability": 0.25
+}

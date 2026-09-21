@@ -1,0 +1,35 @@
+{
+  "name": "jev-agent-eval",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Auditable benchmark scoring and before/after agent-change evaluation with Jev.",
+  "type": "module",
+  "bin": {
+    "jev-agent-eval": "dist/src/agent_eval.js"
+  },
+  "files": [
+    "dist/src/",
+    "examples/",
+    "README.md",
+    "SKILL.md",
+    "auth.txt.example"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "tsc -p tsconfig.json && node --test dist/tests/agent_eval.test.js",
+    "cli": "npm run build --silent && node dist/src/agent_eval.js",
+    "package": "npm pack",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}
